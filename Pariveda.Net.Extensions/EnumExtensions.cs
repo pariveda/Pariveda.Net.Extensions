@@ -1,31 +1,57 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 
 namespace Pariveda.Net.Extensions
 {
     public static class EnumExtensions
     {
-        public static string GetDescription(this Enum enumValue)
+        public static string GetFriendlyName(this Enum e)
         {
-            // Get the field within the enum
-            var memberInfo = enumValue.GetType().GetMember(enumValue.ToString());
+            DescriptionAttribute attribute = GetAttributeOrDefault<DescriptionAttribute>(e);
 
-            // If any members were found
-            if (memberInfo != null && memberInfo.Any())
+            string name = Enum.GetName(e.GetType(), e);
+            if (name != null)
             {
-                // Get any description attributes on member
-                var descriptionAttributes =
-                    memberInfo[0].GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[];
-
-                if (descriptionAttributes != null && descriptionAttributes.Any())
+                if (attribute != null)
                 {
-                    return descriptionAttributes.First().Description;
+                    return attribute.Description;
                 }
+                return Enum.GetName(e.GetType(), e);
             }
 
-            // If no member found or member does not have description attribute, return the default to string value
-            return enumValue.ToString();
+            return string.Empty;
+        }
+
+        public static Expected GetAttributeValueOrDefault<T, Expected>(this Enum e, Func<T, Expected> expression)
+        where T : System.Attribute
+        {
+            T attribute = GetAttributeOrDefault<T>(e);
+
+            if (attribute == null)
+                return default(Expected);
+
+            return expression(attribute);
+        }
+
+        public static T GetAttributeOrDefault<T>(this Enum e) where T : System.Attribute
+        {
+            var firstOrDefault = e
+                .GetType()
+                .GetMember(e.ToString())
+                .FirstOrDefault(member => member.MemberType == MemberTypes.Field);
+            if (firstOrDefault != null)
+            {
+                T attribute = firstOrDefault
+                    .GetCustomAttributes(typeof(T), false)
+                    .Cast<T>()
+                    .SingleOrDefault();
+
+                return attribute;
+            }
+
+            return null;
         }
     }
 }
